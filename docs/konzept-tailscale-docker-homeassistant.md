@@ -113,12 +113,15 @@ Das NAS läuft auf **DSM 7.1.1-42962 Update 9** und seit 349 Tagen ohne Neustart
    - DSM-Konfigurationssicherung (`.dss`) herunterladen.
    - Wichtige Daten per Hyper Backup auf ein externes Ziel, mindestens ein aktueller Stand.
 3. **Update einspielen**
-   - Systemsteuerung → Aktualisieren & Wiederherstellen → *Nach Updates suchen*. Wird 7.2 nicht angeboten: passendes `.pat` für **DS918+** aus dem Synology Download-Center laden und per *Manuelles DSM-Update* einspielen.
-   - Zuerst die höchste angebotene **7.2.x**-Version installieren (nicht 7.1.x-Zwischenstände einzeln). Danach erneut nach Updates suchen, bis keine mehr angeboten werden.
+   - **Wenn DSM „Ihre DSM Version ist aktuell“ meldet** (so beim Stand 7.1.1-42962 Update 9 am 2026-11-10): Das liegt meist an den Update-Einstellungen. Steht dort *Nur wichtige Updates installieren*, bietet DSM nur Patches für 7.1 an, aber **kein Upgrade auf eine neue Hauptversion**. Außerdem rollt Synology größere Versionen gestaffelt aus.
+   - **Weg A, Update-Einstellungen:** Systemsteuerung → Aktualisieren & Wiederherstellen → **Update-Einstellungen** → *Neueste DSM- und Paketupdates* wählen, dabei *Mich benachrichtigen und manuell installieren* (nicht automatisch), speichern. Danach erneut nach Updates suchen. Wird 7.2 dann angeboten, normal installieren.
+   - **Weg B, manuelles Update (zuverlässig):** Im Synology **Download-Center** (synology.com → Support → Download-Center) das Produkt **DS918+** wählen → *Betriebssystem* → die neueste angebotene DSM-Version (mindestens 7.2) als `.pat`-Datei herunterladen. Dann im DSM **Manuelle DSM-Aktualisierung** → Datei auswählen → installieren. Nur `.pat`-Dateien von synology.com für genau dieses Modell verwenden.
+   - Hinweis: Ab DSM 7.2.2 sind einzelne Pakete entfallen (u. a. Video Station). Vorher prüfen, ob Thomas eines davon nutzt.
    - Neustart abwarten (10–20 Minuten).
+   - Nach dem Upgrade erneut nach Updates suchen, bis keine mehr angeboten werden.
 4. **Danach prüfen**
    - DSM-Version im Info-Center, Speicherpool fehlerfrei, alle Pakete laufen (Paket-Zentrum → *Alle aktualisieren*).
-   - Automatische Updates einstellen: Systemsteuerung → Aktualisieren & Wiederherstellen → Update-Einstellungen → *Wichtige Updates automatisch installieren*.
+   - Update-Einstellungen danach so lassen, dass neue Versionen **angezeigt** werden, und Sicherheits-Patches automatisch installieren (*Wichtige Updates automatisch installieren* bzw. die entsprechende Option). So bleibt das NAS aktuell, ohne dass ein Hauptversions-Upgrade ungeplant läuft.
 
 ---
 
