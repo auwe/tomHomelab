@@ -235,6 +235,58 @@ curl -k https://nas-thomas:5001      # DSM über Tailnet
 ping 192.168.1.1                     # Router über Subnet-Route
 ```
 
+### 4.7 Variante: Tailscale als Container statt als Paket
+
+Tailscale lässt sich auch als Docker-Container betreiben. Für die DS918+ im Vergleich:
+
+| Kriterium | **Tailscale-Paket** (Paket-Zentrum) | **Tailscale-Container** (Container Manager) |
+|---|---|---|
+| Abhängigkeit | startet direkt mit DSM | braucht laufenden Container Manager. Fällt Docker aus (Update, Fehler), ist **auch der Fernzugriff weg** |
+| Verfügbar ab | DSM 7.1 (also schon vor dem Update) | sinnvoll erst mit Container Manager, also nach DSM 7.2 |
+| Subnet-Router / Exit-Node | ja, nach `configure-host` (4.3) | ja, mit `network_mode: host`, `/dev/net/tun` und `NET_ADMIN` |
+| Updates | `tailscale set --auto-update` oder Paket-Zentrum | Image neu ziehen |
+| Konfiguration als Code | nein (CLI-Befehle) | ja, `compose.yaml` im Repo |
+| Support | offiziell von Tailscale für Synology dokumentiert | offizielles Image, auf Synology aber weniger erprobt (TUN-Modul muss geladen sein) |
+
+**Empfehlung:** Für den **Zugang zum NAS und zum Heimnetz das Paket**. Der Fernzugriff ist Basis-Infrastruktur und sollte nicht davon abhängen, dass Docker läuft. Gerade beim DSM-Update und bei Docker-Problemen ist Tailscale dann der Weg, um aus der Ferne zu helfen.
+
+Ein Tailscale-Container ist sinnvoll als **Sidecar für einzelne Dienste**, die eine eigene Adresse im Tailnet bekommen sollen (z. B. `dienst.<tailnet>.ts.net` mit HTTPS). Bei Home Assistant als VM übernimmt das das **Tailscale-Add-on** in HA (5.6).
+
+Falls trotzdem gewünscht, Beispiel `/volume1/docker/tailscale/compose.yaml` (dann das Paket **nicht** zusätzlich installieren):
+
+```yaml
+services:
+  tailscale:
+    container_name: tailscale
+    image: tailscale/tailscale:stable
+    network_mode: host
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}          # aus .env, nicht ins Repo
+      - TS_HOSTNAME=nas-thomas
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+      - TS_ROUTES=192.168.1.0/24          # Subnetz aus 2.2
+      - TS_EXTRA_ARGS=--advertise-tags=tag:nas --advertise-exit-node
+    volumes:
+      - /volume1/docker/tailscale/state:/var/lib/tailscale
+```
+
+Fehlt `/dev/net/tun`, per Boot-Aufgabe (Benutzer `root`) laden: `insmod /lib/modules/tun.ko`.
+
+### 4.8 Empfohlene Kombination für die DS918+
+
+| Komponente | Betriebsart |
+|---|---|
+| Tailscale (NAS-Zugang, Subnet-Router) | **Paket** (4.2–4.4) |
+| Home Assistant | **VM mit Home Assistant OS** (5.6), optional mit Tailscale-Add-on |
+| Weitere Dienste | **Container** im Container Manager (5.5), bei Bedarf mit Tailscale-Sidecar |
+
 ---
 
 ## 5. Docker und Home Assistant (Phase 2)
