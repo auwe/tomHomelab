@@ -135,6 +135,42 @@ Das NAS läuft auf **DSM 7.1.1-42962 Update 9** und seit 349 Tagen ohne Neustart
    - DSM-Version im Info-Center, Speicherpool fehlerfrei, alle Pakete laufen (Paket-Zentrum → *Alle aktualisieren*).
    - Update-Einstellungen danach so lassen, dass neue Versionen **angezeigt** werden, und Sicherheits-Patches automatisch installieren (*Wichtige Updates automatisch installieren* bzw. die entsprechende Option). So bleibt das NAS aktuell, ohne dass ein Hauptversions-Upgrade ungeplant läuft.
 
+### 3.2 Was Thomas zum DSM-Update wissen muss (Kurzfassung)
+
+**Das Wichtigste in einem Satz:** Das Update von 7.1.1 auf 7.4.1 ist ein großer Sprung über drei Hauptversionen. Es lässt sich nicht rückgängig machen, das NAS ist dabei ca. 30–60 Minuten nicht erreichbar, und einige wenige Pakete gibt es danach nicht mehr.
+
+**Was sich ändert**
+
+| Bereich | Änderung | Was das für Thomas bedeutet |
+|---|---|---|
+| Docker | Das alte Paket „Docker“ wird zu **Container Manager** | Vorhandene Container werden automatisch übernommen. Neu: Projekte mit `compose.yaml`. |
+| Video Station | **entfällt** (seit 7.2.2) | Wer Filme über Video Station / DS video schaut, braucht Ersatz (z. B. Plex oder Jellyfin als Container). |
+| Synology Photos / Medien | Server-seitige Verarbeitung von **HEVC (H.265) und HEIC** entfällt (seit 7.2.2) | iPhone-Fotos (HEIC) und H.265-Videos bekommen auf dem NAS evtl. keine Vorschaubilder mehr; die Apps am Handy/PC übernehmen das Abspielen. Dateien selbst bleiben unverändert. |
+| Mail | **Synology Mail Server, Mail Station** entfallen (7.4) | Nur relevant, falls Thomas darüber E-Mails betreibt. Dann vorher umziehen. |
+| Web Station | **PHP 8.1** entfällt (7.4) | Nur relevant für selbst gehostete Webseiten auf dem NAS. |
+| Pakete | Viele Synology-Pakete werden auf neue Versionen gehoben | Danach im Paket-Zentrum *Alle aktualisieren*. Pakete von Drittanbietern (z. B. SynoCommunity) laufen evtl. erst nach eigenem Update wieder. |
+| Bedienung | Optik und Menüs teils anders, neuer optionaler Assistent „DSM Agent“ (7.4) | Kein Handlungsbedarf. |
+| Neue Funktionen | z. B. Speicher-Deduplizierung (7.4) | Für die DS918+ größtenteils **nicht** verfügbar, das ist neueren Modellen vorbehalten. |
+| Lebenszyklus | **7.4 ist die letzte Hauptversion für die DS918+** | Sicherheitsupdates kommen weiter, aber keine neuen Hauptversionen. Mittelfristig (einige Jahre) Ersatzgerät einplanen. |
+
+**Was Thomas vorher tun sollte**
+1. **Paketliste anschauen** (Paket-Zentrum → Installiert): Nutzt er Video Station, Mail Server, Mail Station oder eigene Webseiten mit PHP? Wenn ja, vorher Bescheid geben.
+2. **Backup** der wichtigen Daten auf eine externe Platte oder in die Cloud, plus DSM-Konfigurationssicherung.
+3. **Festplatten prüfen** (Speicher-Manager: alle *Normal*). Das NAS lief 349 Tage ohne Neustart. Ein Neustart ist der Moment, in dem eine alte Platte gern ausfällt.
+4. **Zeitfenster** von ca. einer Stunde wählen, in dem niemand das NAS braucht. Familie vorwarnen (Fotos, Medien, Dateifreigaben sind kurz weg).
+5. **Vor Ort oder im Heimnetz** sein, falls das NAS nach dem Neustart nicht von selbst wiederkommt.
+
+**Risiken und wie wir sie abfangen**
+
+| Risiko | Abfederung |
+|---|---|
+| Kein Zurück auf 7.1 | Backup + Paketcheck vorher |
+| Platte fällt beim Neustart aus | Plattencheck vorher, RAID schützt bei einer Platte, Backup für den Rest |
+| Drittanbieter-Paket startet nicht mehr | Liste vorher notieren, danach Update oder Alternative |
+| 12 GB RAM ist mehr als offiziell unterstützt (8 GB) | Läuft in der Praxis; nur relevant, falls Synology-Support kontaktiert wird (dann ggf. Original-RAM einsetzen) |
+
+**Nach dem Update kurz prüfen:** Dateifreigaben erreichbar, Fotos/Medien-Apps funktionieren, Paket-Zentrum ohne Fehler, Speicherpool *Fehlerfrei*.
+
 ---
 
 ## 4. Tailscale installieren und einrichten (Phase 1)
