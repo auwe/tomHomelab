@@ -4,7 +4,7 @@
 |---|---|
 | **Ziel** | Sicherer Fernzugriff auf Thomas' Homelab über Tailscale, ohne offene Ports. Docker (Container Manager) und Home Assistant laufen auf dem NAS. |
 | **System** | Synology NAS, per DDNS erreichbar unter `goelles.myds.me` |
-| **Status** | Entwurf. Die Rahmenbedingungen (Abschnitt 2) sind noch **nicht geprüft**. |
+| **Status** | Entwurf. Hardware und DSM-Version sind geprüft (Abschnitt 2.0), Netzwerk und Entscheidungen noch offen. |
 | **Stand** | 2026-11-10 |
 
 ---
@@ -40,14 +40,26 @@
 
 Diese Punkte zuerst mit Thomas klären oder am NAS ablesen. Die Befehle laufen per SSH auf dem NAS (DSM → Systemsteuerung → Terminal & SNMP → SSH vorübergehend aktivieren) oder sind im DSM unter **Systemsteuerung → Infocenter** sichtbar.
 
+### 2.0 Ist-Stand (geprüft am 2026-11-10, DSM Info-Center)
+
+| Eigenschaft | Wert | Bewertung |
+|---|---|---|
+| Modell | **DS918+** | x86-Modell, unterstützt Container Manager und Virtual Machine Manager. |
+| CPU | **Intel Celeron J3455**, 4 Kerne, 1,5 GHz (x86_64, Apollo Lake) | Hat VT-x, damit sind VMs möglich. Für Home Assistant ausreichend, aber keine Reserven für viele schwere Container. |
+| RAM | **12 GB** | Mehr als genug für HA OS als VM (3–4 GB) plus Docker-Container. Synology gibt für die DS918+ offiziell max. 8 GB an; 12 GB laufen in der Praxis, VMM kann aber einen Hinweis zeigen. |
+| DSM-Version | **DSM 7.1.1-42962 Update 9** | ❗ **Zu alt.** Container Manager und Compose-Projekte gibt es erst ab DSM 7.2. Unter 7.1 nur das alte Paket „Docker“. **Update auf 7.2 ist Voraussetzung** (siehe 3.1). |
+| QuickConnect | **deaktiviert** | Gut. Externer Zugriff läuft derzeit vermutlich über DDNS `goelles.myds.me` und Portfreigaben (prüfen in 2.2). |
+| Zeit / Zeitzone | NTP `time.google.com`, GMT+01:00 Wien | Passt. `TZ=Europe/Vienna` für Container. |
+| Laufzeit | **349 Tage** ohne Neustart | Hinweis, dass länger keine DSM-Updates eingespielt wurden. Vor dem Update Festplatten-Zustand prüfen (siehe 3.1). |
+
 ### 2.1 Hardware und DSM
 
 | ✔ | Prüfpunkt | Wie prüfen | Anforderung / Bewertung |
 |---|---|---|---|
-| ☐ | **NAS-Modell** | Infocenter → Allgemein | Notieren. Mit Synology-Kompatibilitätsliste für *Container Manager* und *Virtual Machine Manager* abgleichen. |
-| ☐ | **CPU-Architektur** | `uname -m`, `grep -m1 "model name" /proc/cpuinfo` | `x86_64` (Intel/AMD): alles möglich. `aarch64`: Container Manager nur auf einigen Modellen, **keine** Home-Assistant-VM. `armv7`: kein Docker, Konzept nicht umsetzbar. |
-| ☐ | **DSM-Version** | `cat /etc.defaults/VERSION` | **DSM 7.2 oder neuer** (Container Manager inkl. Compose-Projekte). Aktuelle Sicherheitsupdates eingespielt. |
-| ☐ | **RAM** | `free -h` / Infocenter | Minimum 2 GB (nur Tailscale + HA-Container, knapp). **Empfohlen ≥ 4 GB** für HA-Container plus weitere Container. **≥ 8 GB**, wenn HA als VM laufen soll. RAM-Erweiterung beim Modell prüfen. |
+| ✅ | **NAS-Modell** | Infocenter → Allgemein | **DS918+.** Mit Synology-Kompatibilitätsliste für *Container Manager* und *Virtual Machine Manager* abgleichen. |
+| ✅ | **CPU-Architektur** | `uname -m`, `grep -m1 "model name" /proc/cpuinfo` | `x86_64` (Intel/AMD): alles möglich. `aarch64`: Container Manager nur auf einigen Modellen, **keine** Home-Assistant-VM. `armv7`: kein Docker, Konzept nicht umsetzbar. **→ J3455, x86_64.** |
+| ❗ | **DSM-Version** | `cat /etc.defaults/VERSION` | **DSM 7.2 oder neuer** (Container Manager inkl. Compose-Projekte). Aktuelle Sicherheitsupdates eingespielt. **→ Ist 7.1.1-42962 Update 9, Update nötig (3.1).** |
+| ✅ | **RAM** | `free -h` / Infocenter | Minimum 2 GB (nur Tailscale + HA-Container, knapp). **Empfohlen ≥ 4 GB** für HA-Container plus weitere Container. **≥ 8 GB**, wenn HA als VM laufen soll. RAM-Erweiterung beim Modell prüfen. **→ 12 GB, erfüllt.** |
 | ☐ | **Speicher / Dateisystem** | Speicher-Manager, `df -h /volume1` | Volume mit **Btrfs** (für Snapshots). ≥ 20 GB frei für Docker-Images und HA-Datenbank. Möglichst SSD-Cache oder SSD-Volume für die HA-Datenbank. |
 | ☐ | **TUN-Device** | `ls -l /dev/net/tun` | Muss existieren (für Subnet-Router/Exit-Node über Kernel-Netzwerk). |
 | ☐ | **USB-Funkstick** (Zigbee/Z-Wave/Thread) | Welcher Stick? `ls /dev/ttyUSB* /dev/ttyACM*` | DSM 7 bringt nur wenige USB-Serial-Treiber mit. Netzwerkbasierte Koordinatoren (z. B. Ethernet-Zigbee-Gateways) sind auf Synology deutlich robuster. |
@@ -72,7 +84,7 @@ Diese Punkte zuerst mit Thomas klären oder am NAS ablesen. Die Befehle laufen p
 | ✔ | Entscheidung | Optionen | Empfehlung |
 |---|---|---|---|
 | ☐ | **Wem gehört das Tailnet?** | a) Thomas hat ein eigenes Tailnet, Mike wird als Benutzer eingeladen. b) Das NAS tritt Mikes Tailnet bei. | **a)** Thomas bleibt Eigentümer seiner Infrastruktur, Mike bekommt per Einladung und ACL genau die nötigen Rechte. |
-| ☐ | **Home Assistant als Container oder als VM?** | siehe Abschnitt 5.1 | Container, wenn RAM < 8 GB oder CPU ≠ x86_64. Sonst VM (HA OS) erwägen. |
+| ☐ | **Home Assistant als Container oder als VM?** | siehe Abschnitt 5.1 | Mit 12 GB RAM und x86-CPU: **VM mit Home Assistant OS** (5.6). Docker bleibt für weitere Dienste. |
 | ☐ | **Exit-Node?** | ja / nein | Nur aktivieren, wenn tatsächlich gebraucht (z. B. sicheres Surfen unterwegs über Thomas' Anschluss). |
 | ☐ | **Admin-Zugang** | DSM-Admin-Konto für die Einrichtung | Eigenes, benanntes Admin-Konto mit 2FA; Standardkonto `admin` deaktiviert. |
 | ☐ | **Backup-Ziel** | USB-Disk, zweites NAS, Cloud (C2, S3 …) | Mindestens ein Ziel außerhalb des NAS, besser zusätzlich offsite. |
@@ -81,11 +93,32 @@ Diese Punkte zuerst mit Thomas klären oder am NAS ablesen. Die Befehle laufen p
 
 ## 3. Vorbereitung (Phase 0)
 
-1. **DSM aktualisieren** (Systemsteuerung → Aktualisieren & Wiederherstellen) und Neustart abwarten.
+1. **DSM auf 7.2 aktualisieren**, siehe 3.1. Ohne diesen Schritt gibt es keinen Container Manager.
 2. **Konfigurations-Backup** von DSM ziehen (Systemsteuerung → Aktualisieren & Wiederherstellen → Konfigurationssicherung → Sichern).
 3. **Snapshot** des Volumes anlegen (Paket *Snapshot Replication*), falls Btrfs.
 4. **Kontohygiene:** eigenes Admin-Konto, **2FA** aktiv, Konto `admin` deaktiviert, *Automatische Blockierung* aktiv (Systemsteuerung → Sicherheit → Konto).
 5. **Freigegebenen Ordner `docker` anlegen** (Systemsteuerung → Freigegebener Ordner), z. B. `/volume1/docker`. Wird bei der Installation von Container Manager auch automatisch angelegt.
+
+### 3.1 DSM-Update von 7.1.1 auf 7.2 (Voraussetzung)
+
+Das NAS läuft auf **DSM 7.1.1-42962 Update 9** und seit 349 Tagen ohne Neustart. Das Update ist nötig, weil **Container Manager** (mit Compose-Projekten) erst ab DSM 7.2 verfügbar ist. Außerdem fehlen so Sicherheitsupdates.
+
+**Wichtig:** Ein DSM-Upgrade lässt sich **nicht rückgängig machen** (kein Downgrade). Deshalb mit Wartungsfenster und vor Ort bzw. mit Zugang zum LAN durchführen.
+
+1. **Vorher prüfen**
+   - Speicher-Manager → HDD/SSD: alle Laufwerke *Normal*, S.M.A.R.T.-Test ohne Fehler, Speicherpool *Fehlerfrei*. Nach fast einem Jahr Laufzeit ist der Neustart der erste Test, ob alle Platten sauber wieder hochkommen.
+   - Paket-Zentrum: Liste der installierten Pakete notieren. Alte, nicht mehr gebrauchte Pakete entfernen.
+   - Falls das alte Paket **Docker** installiert ist: Liste der Container und deren Volumes notieren. Beim Upgrade wird es automatisch zu **Container Manager** migriert; Container bleiben erhalten.
+2. **Sichern**
+   - DSM-Konfigurationssicherung (`.dss`) herunterladen.
+   - Wichtige Daten per Hyper Backup auf ein externes Ziel, mindestens ein aktueller Stand.
+3. **Update einspielen**
+   - Systemsteuerung → Aktualisieren & Wiederherstellen → *Nach Updates suchen*. Wird 7.2 nicht angeboten: passendes `.pat` für **DS918+** aus dem Synology Download-Center laden und per *Manuelles DSM-Update* einspielen.
+   - Zuerst die höchste angebotene **7.2.x**-Version installieren (nicht 7.1.x-Zwischenstände einzeln). Danach erneut nach Updates suchen, bis keine mehr angeboten werden.
+   - Neustart abwarten (10–20 Minuten).
+4. **Danach prüfen**
+   - DSM-Version im Info-Center, Speicherpool fehlerfrei, alle Pakete laufen (Paket-Zentrum → *Alle aktualisieren*).
+   - Automatische Updates einstellen: Systemsteuerung → Aktualisieren & Wiederherstellen → Update-Einstellungen → *Wichtige Updates automatisch installieren*.
 
 ---
 
@@ -218,7 +251,13 @@ ping 192.168.1.1                     # Router über Subnet-Route
 | USB-Sticks | schwierig (Treiber unter DSM) | per USB-Passthrough, meist einfacher |
 | Passt zu „Docker auf dem NAS“ | ✅ | Docker läuft zusätzlich, HA aber getrennt |
 
-**Empfehlung:** Für den Start den **Container** (unten ausführlich beschrieben). Ein späterer Umzug in eine VM ist über HA-Backup/Restore möglich.
+**Empfehlung für die DS918+ (12 GB RAM, J3455):** **Home Assistant OS als VM** im Virtual Machine Manager (Abschnitt 5.6). Gründe:
+- Der RAM reicht locker (VM 4 GB, Rest für DSM und Docker).
+- Die J3455 unterstützt Virtualisierung (VT-x).
+- Add-ons (Apps), Updates per Klick und vollständige HA-Backups sind die von Home Assistant empfohlene Betriebsart.
+- USB-Sticks lassen sich per Passthrough an die VM durchreichen, statt mit DSM-Treibern zu kämpfen.
+
+Docker (Container Manager) läuft trotzdem auf dem NAS, für weitere Dienste (5.5). Die **Container-Variante (5.3)** bleibt als schlankere Alternative beschrieben, z. B. falls die VM auf der J3455 zu träge wirkt. Ein Wechsel ist jederzeit über HA-Backup/Restore möglich.
 
 ### 5.2 Container Manager installieren
 
@@ -289,10 +328,30 @@ Weitere Dienste (z. B. Mosquitto, Zigbee2MQTT, Node-RED) jeweils als eigenes Com
 
 ---
 
+### 5.6 Home Assistant OS als VM (empfohlen für diese Hardware)
+
+1. Paket-Zentrum → **Virtual Machine Manager** installieren. Beim ersten Start Speicher (Volume) für VMs wählen.
+2. Netzwerk: Im VMM unter *Netzwerk* prüfen, dass der Standard-Switch an der LAN-Schnittstelle des NAS hängt (Open vSwitch wird dabei aktiviert). Die VM bekommt dann eine **eigene IP im LAN**.
+3. Image laden: Von <https://www.home-assistant.io/installation/alternative> das **`.ova`-Image für KVM/Virtual Machine Manager** (`haos_ova-<version>.ova`) herunterladen.
+4. VMM → *Virtuelle Maschine* → **Erstellen** → *Importieren* → *Aus OVA-Datei importieren*.
+5. Ressourcen:
+   - **CPU:** 2 vCPU
+   - **RAM:** 4 GB (später ggf. 3 GB)
+   - **Firmware:** **UEFI** (wichtig, sonst bootet HA OS nicht)
+   - Festplatte: Standard aus dem OVA, bei Bedarf auf 32 GB vergrößern
+   - Netzwerk: Standard-Switch (LAN)
+6. *Automatisch starten* bei NAS-Start aktivieren (VM-Einstellungen → Andere → Autostart: *Letzter Status* bzw. *Ein*).
+7. VM starten, im Router eine **DHCP-Reservierung** für die VM anlegen, dann `http://homeassistant.local:8123` oder `http://<VM-IP>:8123` öffnen und das Onboarding durchführen. **2FA** im HA-Profil aktivieren.
+8. **Tailscale:** Die VM ist über die Subnet-Route (4.4) erreichbar. Für eine eigene `*.ts.net`-Adresse mit HTTPS kann zusätzlich das **Tailscale-Add-on** in HA installiert werden (Gerät `homeassistant` mit Tag, z. B. `tag:ha`, in der Policy ergänzen). `tailscale serve` auf dem NAS (5.4) ist bei der VM nicht nötig.
+9. **USB-Funkstick:** VMM → VM → Bearbeiten → *USB-Gerät* hinzufügen.
+10. **Backups:** HA → Einstellungen → System → Backups: automatische tägliche Backups, Speicherort zusätzlich ein Netzwerkspeicher auf dem NAS (SMB-Freigabe, z. B. `/volume1/backup/homeassistant`). Ergänzend VMM-Snapshots vor HA-Updates.
+
+---
+
 ## 6. Absicherung (Phase 3)
 
 1. **Portfreigaben am Router schließen** (alle aus Checkliste 2.2), sobald der Zugriff über Tailscale getestet ist.
-2. **QuickConnect** deaktivieren, falls nicht mehr benötigt (Systemsteuerung → QuickConnect).
+2. **QuickConnect** ist bereits deaktiviert (geprüft 2026-11-10), so lassen.
 3. **DSM-Firewall** aktivieren:
    - Erlauben: LAN-Subnetz, Tailscale-Bereich `100.64.0.0/10` (und `fd7a:115c:a1e0::/48` für IPv6).
    - Alles andere: ablehnen.
@@ -322,15 +381,15 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 |---|---|---|---|
 | 1 | Checkliste Abschnitt 2 ausfüllen, Ergebnisse hier im Repo festhalten | Mike + Thomas | ☐ |
 | 2 | Entscheidungen 2.3 treffen (Tailnet-Eigentümer, Container/VM, Exit-Node) | Mike + Thomas | ☐ |
-| 3 | DSM aktualisieren, Konfig-Backup, Snapshot, Admin-Konto mit 2FA | Thomas / Mike | ☐ |
+| 3 | **DSM 7.1.1 → 7.2 aktualisieren (3.1)**, Konfig-Backup, Snapshot, Admin-Konto mit 2FA | Thomas / Mike, mit LAN-Zugang | ☐ |
 | 4 | Tailnet anlegen, Mike einladen, Policy (4.5) einspielen, Auth-Key erzeugen | Thomas | ☐ |
 | 5 | Tailscale-Paket installieren und anmelden (4.2) | vor Ort oder per bestehendem Zugang | ☐ |
 | 6 | `configure-host` + Boot-Aufgabe einrichten (4.3) | Admin | ☐ |
 | 7 | Subnet-Route (und ggf. Exit-Node) bewerben, freigeben, Key-Expiry deaktivieren (4.4) | Admin | ☐ |
 | 8 | Zugriff von außen testen (4.6) | Mike | ☐ |
-| 9 | Container Manager installieren, HA-Compose-Projekt starten (5.2, 5.3) | Admin | ☐ |
-| 10 | HA-Onboarding, 2FA, `tailscale serve` + `trusted_proxies` (5.4) | Admin | ☐ |
-| 11 | Portfreigaben schließen, QuickConnect aus, Firewall an (6) | Admin | ☐ |
+| 9 | Container Manager installieren (5.2); Home Assistant OS als VM einrichten (5.6), alternativ als Container (5.3) | Admin | ☐ |
+| 10 | HA-Onboarding, 2FA; HTTPS über Tailscale-Add-on (VM) oder `tailscale serve` + `trusted_proxies` (Container, 5.4) | Admin | ☐ |
+| 11 | Portfreigaben schließen, Firewall an (6) | Admin | ☐ |
 | 12 | Backups einrichten und Wiederherstellung einmal testen (7) | Admin | ☐ |
 | 13 | Ist-Zustand dokumentieren (Subnetz, IPs, Versionen) und Compose/Policy ins Repo | Mike | ☐ |
 
@@ -340,7 +399,10 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 
 ## 9. Offene Punkte
 
-- [ ] Ergebnisse der Checkliste (Modell, CPU, RAM, DSM-Version, Subnetz) eintragen.
+- [x] Modell, CPU, RAM, DSM-Version erfasst (2.0).
+- [ ] DSM auf 7.2 aktualisieren (3.1).
+- [ ] Netzwerk-Checkliste 2.2 (Subnetz, Portfreigaben, Router) ausfüllen.
+- [ ] Speicher-Checkliste (Btrfs, freier Platz, Laufwerkszustand) prüfen.
 - [ ] Prüfen, ob sich Thomas' Subnetz mit Mikes Netzen überschneidet.
 - [ ] Klären, ob Funk-Hardware (Zigbee/Z-Wave/Thread/Bluetooth) für HA benötigt wird.
 - [ ] Backup-Ziel außerhalb des NAS festlegen.
@@ -353,4 +415,5 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 - Tailnet-Policy / Grants: <https://tailscale.com/kb/1324/grants>
 - Tailscale Serve: <https://tailscale.com/kb/1312/serve>
 - Home Assistant Container-Installation: <https://www.home-assistant.io/installation/linux#docker-compose>
+- Home Assistant OS auf Synology VMM: <https://www.home-assistant.io/installation/alternative>
 - Synology Container Manager: <https://www.synology.com/de-de/dsm/feature/container-manager>
