@@ -47,7 +47,7 @@ Diese Punkte zuerst mit Thomas klären oder am NAS ablesen. Die Befehle laufen p
 | Modell | **DS918+** | x86-Modell, unterstützt Container Manager und Virtual Machine Manager. |
 | CPU | **Intel Celeron J3455**, 4 Kerne, 1,5 GHz (x86_64, Apollo Lake) | Hat VT-x, damit sind VMs möglich. Für Home Assistant ausreichend, aber keine Reserven für viele schwere Container. |
 | RAM | **12 GB** | Mehr als genug für HA OS als VM (3–4 GB) plus Docker-Container. Synology gibt für die DS918+ offiziell max. 8 GB an; 12 GB laufen in der Praxis, VMM kann aber einen Hinweis zeigen. |
-| DSM-Version | **DSM 7.1.1-42962 Update 9** | ❗ **Zu alt.** Container Manager und Compose-Projekte gibt es erst ab DSM 7.2. Unter 7.1 nur das alte Paket „Docker“. **Update auf 7.2 ist Voraussetzung** (siehe 3.1). |
+| DSM-Version | **DSM 7.1.1-42962 Update 9** | ❗ **Zu alt.** Container Manager und Compose-Projekte gibt es erst ab DSM 7.2. Unter 7.1 nur das alte Paket „Docker“. **Update ist Voraussetzung, Ziel: DSM 7.4.1** (siehe 3.1). |
 | QuickConnect | **deaktiviert** | Gut. Externer Zugriff läuft derzeit vermutlich über DDNS `goelles.myds.me` und Portfreigaben (prüfen in 2.2). |
 | Zeit / Zeitzone | NTP `time.google.com`, GMT+01:00 Wien | Passt. `TZ=Europe/Vienna` für Container. |
 | Laufzeit | **349 Tage** ohne Neustart | Hinweis, dass länger keine DSM-Updates eingespielt wurden. Vor dem Update Festplatten-Zustand prüfen (siehe 3.1). |
@@ -58,7 +58,7 @@ Diese Punkte zuerst mit Thomas klären oder am NAS ablesen. Die Befehle laufen p
 |---|---|---|---|
 | ✅ | **NAS-Modell** | Infocenter → Allgemein | **DS918+.** Mit Synology-Kompatibilitätsliste für *Container Manager* und *Virtual Machine Manager* abgleichen. |
 | ✅ | **CPU-Architektur** | `uname -m`, `grep -m1 "model name" /proc/cpuinfo` | `x86_64` (Intel/AMD): alles möglich. `aarch64`: Container Manager nur auf einigen Modellen, **keine** Home-Assistant-VM. `armv7`: kein Docker, Konzept nicht umsetzbar. **→ J3455, x86_64.** |
-| ❗ | **DSM-Version** | `cat /etc.defaults/VERSION` | **DSM 7.2 oder neuer** (Container Manager inkl. Compose-Projekte). Aktuelle Sicherheitsupdates eingespielt. **→ Ist 7.1.1-42962 Update 9, Update nötig (3.1).** |
+| ❗ | **DSM-Version** | `cat /etc.defaults/VERSION` | **DSM 7.2 oder neuer** (Container Manager inkl. Compose-Projekte). Aktuelle Sicherheitsupdates eingespielt. **→ Ist 7.1.1-42962 Update 9, Update auf 7.4.1 nötig (3.1).** |
 | ✅ | **RAM** | `free -h` / Infocenter | Minimum 2 GB (nur Tailscale + HA-Container, knapp). **Empfohlen ≥ 4 GB** für HA-Container plus weitere Container. **≥ 8 GB**, wenn HA als VM laufen soll. RAM-Erweiterung beim Modell prüfen. **→ 12 GB, erfüllt.** |
 | ☐ | **Speicher / Dateisystem** | Speicher-Manager, `df -h /volume1` | Volume mit **Btrfs** (für Snapshots). ≥ 20 GB frei für Docker-Images und HA-Datenbank. Möglichst SSD-Cache oder SSD-Volume für die HA-Datenbank. |
 | ☐ | **TUN-Device** | `ls -l /dev/net/tun` | Muss existieren (für Subnet-Router/Exit-Node über Kernel-Netzwerk). |
@@ -93,15 +93,28 @@ Diese Punkte zuerst mit Thomas klären oder am NAS ablesen. Die Befehle laufen p
 
 ## 3. Vorbereitung (Phase 0)
 
-1. **DSM auf 7.2 aktualisieren**, siehe 3.1. Ohne diesen Schritt gibt es keinen Container Manager.
+1. **DSM auf 7.4.1 aktualisieren**, siehe 3.1. Ohne diesen Schritt gibt es keinen Container Manager.
 2. **Konfigurations-Backup** von DSM ziehen (Systemsteuerung → Aktualisieren & Wiederherstellen → Konfigurationssicherung → Sichern).
 3. **Snapshot** des Volumes anlegen (Paket *Snapshot Replication*), falls Btrfs.
 4. **Kontohygiene:** eigenes Admin-Konto, **2FA** aktiv, Konto `admin` deaktiviert, *Automatische Blockierung* aktiv (Systemsteuerung → Sicherheit → Konto).
 5. **Freigegebenen Ordner `docker` anlegen** (Systemsteuerung → Freigegebener Ordner), z. B. `/volume1/docker`. Wird bei der Installation von Container Manager auch automatisch angelegt.
 
-### 3.1 DSM-Update von 7.1.1 auf 7.2 (Voraussetzung)
+### 3.1 DSM-Update von 7.1.1 auf 7.4.1 (Voraussetzung)
 
 Das NAS läuft auf **DSM 7.1.1-42962 Update 9** und seit 349 Tagen ohne Neustart. Das Update ist nötig, weil **Container Manager** (mit Compose-Projekten) erst ab DSM 7.2 verfügbar ist. Außerdem fehlen so Sicherheitsupdates.
+
+**Zielversion: direkt DSM 7.4.1-90080 + Update 1** (Stand Download-Center am 2026-11-10), keine Zwischenstation auf 7.2 oder 7.3. Begründung:
+- Für die DS918+ ist **DSM 7.4 die letzte Hauptversion**. Jede Zwischenversion wäre nur ein zusätzlicher, ebenfalls nicht umkehrbarer Neustart mit eigenem Risiko.
+- 7.4.1 erschien im Juli 2026 und hat inzwischen Update 1. Die übliche Empfehlung, 1–3 Monate nach Erscheinen abzuwarten, ist damit erfüllt.
+- Container Manager und Virtual Machine Manager sind weiterhin verfügbar. Nach dem Update im Paket-Zentrum prüfen.
+
+**Warum DSM „Ihre DSM Version ist aktuell“ meldet:** Synology bietet 7.4.1 für ältere Modelle, darunter die **DS918+**, ausdrücklich **nicht** über die automatische Update-Benachrichtigung an. Für diese Modelle gibt es das Update nur manuell über das Download-Center.
+
+**Entfallene Pakete, vorher prüfen, ob Thomas sie nutzt:**
+- ab 7.2.2: **Video Station**; Server-seitige HEVC/HEIC-Verarbeitung (z. B. in Synology Photos) entfällt.
+- ab 7.4: **Synology Mail Server**, **Mail Station**, **PHP 8.1**.
+- 7.4.1: KMIP-Client-Authentifizierung braucht Zertifikate einer privaten CA (nur relevant, falls KMIP genutzt wird).
+- Snapshot Replication wird automatisch oder manuell auf eine kompatible Version aktualisiert.
 
 **Wichtig:** Ein DSM-Upgrade lässt sich **nicht rückgängig machen** (kein Downgrade). Deshalb mit Wartungsfenster und vor Ort bzw. mit Zugang zum LAN durchführen.
 
@@ -113,10 +126,9 @@ Das NAS läuft auf **DSM 7.1.1-42962 Update 9** und seit 349 Tagen ohne Neustart
    - DSM-Konfigurationssicherung (`.dss`) herunterladen.
    - Wichtige Daten per Hyper Backup auf ein externes Ziel, mindestens ein aktueller Stand.
 3. **Update einspielen**
-   - **Wenn DSM „Ihre DSM Version ist aktuell“ meldet** (so beim Stand 7.1.1-42962 Update 9 am 2026-11-10): Das liegt meist an den Update-Einstellungen. Steht dort *Nur wichtige Updates installieren*, bietet DSM nur Patches für 7.1 an, aber **kein Upgrade auf eine neue Hauptversion**. Außerdem rollt Synology größere Versionen gestaffelt aus.
-   - **Weg A, Update-Einstellungen:** Systemsteuerung → Aktualisieren & Wiederherstellen → **Update-Einstellungen** → *Neueste DSM- und Paketupdates* wählen, dabei *Mich benachrichtigen und manuell installieren* (nicht automatisch), speichern. Danach erneut nach Updates suchen. Wird 7.2 dann angeboten, normal installieren.
-   - **Weg B, manuelles Update (zuverlässig):** Im Synology **Download-Center** (synology.com → Support → Download-Center) das Produkt **DS918+** wählen → *Betriebssystem* → die neueste angebotene DSM-Version (mindestens 7.2) als `.pat`-Datei herunterladen. Dann im DSM **Manuelle DSM-Aktualisierung** → Datei auswählen → installieren. Nur `.pat`-Dateien von synology.com für genau dieses Modell verwenden.
-   - Hinweis: Ab DSM 7.2.2 sind einzelne Pakete entfallen (u. a. Video Station). Vorher prüfen, ob Thomas eines davon nutzt.
+   - Im Synology **Download-Center** (synology.com → Support → Download-Center) Produkt **DS918+** → *Betriebssystem*. Im Bereich *Upgrade from your current DSM version* als aktuelle Version **7.1.1-42962 Update 9** und als Ziel **7.4.1-90080 Update 1** wählen. Die Seite zeigt dann, welche `.pat`-Dateien **in welcher Reihenfolge** zu installieren sind (in der Regel zuerst `DSM 7.4.1-90080`, danach das Update 1).
+   - Jede Datei der Reihe nach über **Manuelle DSM-Aktualisierung** einspielen und jeweils den Neustart abwarten. Nur `.pat`-Dateien von synology.com für genau dieses Modell verwenden.
+   - Die Update-Einstellungen müssen dafür nicht geändert werden.
    - Neustart abwarten (10–20 Minuten).
    - Nach dem Upgrade erneut nach Updates suchen, bis keine mehr angeboten werden.
 4. **Danach prüfen**
@@ -245,7 +257,7 @@ Tailscale lässt sich auch als Docker-Container betreiben. Für die DS918+ im Ve
 | Kriterium | **Tailscale-Paket** (Paket-Zentrum) | **Tailscale-Container** (Container Manager) |
 |---|---|---|
 | Abhängigkeit | startet direkt mit DSM | braucht laufenden Container Manager. Fällt Docker aus (Update, Fehler), ist **auch der Fernzugriff weg** |
-| Verfügbar ab | DSM 7.1 (also schon vor dem Update) | sinnvoll erst mit Container Manager, also nach DSM 7.2 |
+| Verfügbar ab | DSM 7.1 (also schon vor dem Update) | sinnvoll erst mit Container Manager, also nach dem DSM-Update |
 | Subnet-Router / Exit-Node | ja, nach `configure-host` (4.3) | ja, mit `network_mode: host`, `/dev/net/tun` und `NET_ADMIN` |
 | Updates | `tailscale set --auto-update` oder Paket-Zentrum | Image neu ziehen |
 | Konfiguration als Code | nein (CLI-Befehle) | ja, `compose.yaml` im Repo |
@@ -436,7 +448,7 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 |---|---|---|---|
 | 1 | Checkliste Abschnitt 2 ausfüllen, Ergebnisse hier im Repo festhalten | Mike + Thomas | ☐ |
 | 2 | Entscheidungen 2.3 treffen (Tailnet-Eigentümer, Container/VM, Exit-Node) | Mike + Thomas | ☐ |
-| 3 | **DSM 7.1.1 → 7.2 aktualisieren (3.1)**, Konfig-Backup, Snapshot, Admin-Konto mit 2FA | Thomas / Mike, mit LAN-Zugang | ☐ |
+| 3 | **DSM 7.1.1 → 7.4.1 aktualisieren (3.1)**, Konfig-Backup, Snapshot, Admin-Konto mit 2FA | Thomas / Mike, mit LAN-Zugang | ☐ |
 | 4 | Tailnet anlegen, Mike einladen, Policy (4.5) einspielen, Auth-Key erzeugen | Thomas | ☐ |
 | 5 | Tailscale-Paket installieren und anmelden (4.2) | vor Ort oder per bestehendem Zugang | ☐ |
 | 6 | `configure-host` + Boot-Aufgabe einrichten (4.3) | Admin | ☐ |
@@ -455,7 +467,7 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 ## 9. Offene Punkte
 
 - [x] Modell, CPU, RAM, DSM-Version erfasst (2.0).
-- [ ] DSM auf 7.2 aktualisieren (3.1).
+- [ ] DSM auf 7.4.1 + Update 1 aktualisieren (3.1); vorher genutzte Pakete mit der Liste entfallener Pakete abgleichen.
 - [ ] Netzwerk-Checkliste 2.2 (Subnetz, Portfreigaben, Router) ausfüllen.
 - [ ] Speicher-Checkliste (Btrfs, freier Platz, Laufwerkszustand) prüfen.
 - [ ] Prüfen, ob sich Thomas' Subnetz mit Mikes Netzen überschneidet.
@@ -470,5 +482,7 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 - Tailnet-Policy / Grants: <https://tailscale.com/kb/1324/grants>
 - Tailscale Serve: <https://tailscale.com/kb/1312/serve>
 - Home Assistant Container-Installation: <https://www.home-assistant.io/installation/linux#docker-compose>
+- DSM-Release-Notes DS918+: <https://www.synology.com/de-de/releaseNote/DSM?model=DS918%2B>
+- DSM 7.4 Übersicht (NASCompares): <https://nascompares.com/news/synology-dsm-7-4-released-should-you-upgrade/>
 - Home Assistant OS auf Synology VMM: <https://www.home-assistant.io/installation/alternative>
 - Synology Container Manager: <https://www.synology.com/de-de/dsm/feature/container-manager>
