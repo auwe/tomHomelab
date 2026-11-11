@@ -297,6 +297,15 @@ Stand 2026-11-11: HA ist im Tailnet als `https://homeassistant.taila5009f.ts.net
 | B. `tailscale funnel` nur für den MCP-Pfad + Custom Connector in claude.ai | öffentlich | nur mit Authentifizierung (HA-OAuth bzw. Long-Lived Token), widerspricht Grundsatz aus 5.4 → bewusste Entscheidung nötig |
 | C. ha-mcp-Add-on mit geheimer URL, wie bei den anderen Standorten | je nach Veröffentlichung | einheitlich mit bestehenden Connectors, geheime URL wie ein Passwort behandeln |
 
+
+**Entscheidung 2026-11-11: Variante C** (wie bei Karin: Add-on „Home Assistant MCP Server“ + „Webhook Proxy for HA MCP“ aus dem Repository `https://github.com/homeassistant-ai/ha-mcp`).
+
+1. Einstellungen → Add-ons → Add-on-Store → ⋮ → Repositories → `https://github.com/homeassistant-ai/ha-mcp` hinzufügen.
+2. „Home Assistant MCP Server“ installieren, starten, „Beim Start starten“ und „Watchdog“ aktivieren. Im Log steht die geheime MCP-URL.
+3. „Webhook Proxy for HA MCP“ installieren und starten. Er leitet einen geheimen Webhook-Pfad von HA auf den MCP-Server weiter; die öffentliche URL steht im Log.
+4. HA öffentlich per HTTPS erreichbar machen: im Tailscale-Add-on die Option `funnel` aktivieren (alternativ Cloudflared oder Nabu Casa). Danach ist die HA-Anmeldeseite öffentlich → starke Passwörter und 2FA für alle HA-Benutzer.
+5. In claude.ai → Einstellungen → Connectors → Custom Connector hinzufügen, Name `HA_Thomas`, URL = öffentliche Webhook-URL aus Schritt 3. Die URL wie ein Passwort behandeln, nicht ins Repo.
+
 Beispiel Variante A (Claude Code auf einem Rechner im Tailnet; Token nur lokal, nie ins Repo):
 
 ```bash
@@ -367,7 +376,7 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 - [ ] Prüfen, ob sich Thomas' Subnetz mit Mikes Netzen überschneidet.
 - [ ] Klären, ob Funk-Hardware (Zigbee/Z-Wave/Thread/Bluetooth) für HA benötigt wird.
 - [ ] Backup-Ziel außerhalb des NAS festlegen.
-- [ ] MCP-Anbindung: Variante A, B oder C wählen (Abschnitt 5.6) und aus dem Tailnet testen.
+- [ ] MCP-Anbindung Variante C umsetzen und testen (Abschnitt 5.6).
 
 ## Quellen
 
