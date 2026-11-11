@@ -385,7 +385,7 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 - [ ] Klären, ob Funk-Hardware (Zigbee/Z-Wave/Thread/Bluetooth) für HA benötigt wird.
 - [ ] Backup-Ziel außerhalb des NAS festlegen.
 - [x] MCP-Anbindung Variante C umgesetzt; Funnel öffentlich getestet 2026-11-11 (Webhook antwortet 401 + OAuth, Metadaten 200).
-- [ ] Connector `HA_Thomas` in claude.ai anlegen und Tools testen.
+- [x] Connector `HA_Thomas` in claude.ai angelegt und getestet (2026-11-11); ha-mcp auf 9.2.0 aktualisiert.
 
 ## Quellen
 
