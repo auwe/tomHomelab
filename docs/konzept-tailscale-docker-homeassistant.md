@@ -283,6 +283,29 @@ Für die **HA-Companion-App** auf dem Handy diese URL als interne und externe UR
 
 > **Kein `tailscale funnel`** für Home Assistant, außer es gibt einen zwingenden Grund. Funnel macht den Dienst öffentlich im Internet erreichbar.
 
+### 5.6 Home Assistant als MCP-Server für Claude anbinden
+
+Stand 2026-11-11: HA ist im Tailnet als `https://homeassistant.taila5009f.ts.net` erreichbar, der MCP-Endpunkt ist `https://homeassistant.taila5009f.ts.net/api/mcp` (HA-Integration „Model Context Protocol Server“).
+
+**Testergebnis:** Aus der Claude-Cloud ist die URL nicht erreichbar (ausgehende Verbindung vom Proxy blockiert, kein öffentlicher DNS-Eintrag sichtbar). Ein Test aus dem Tailnet steht noch aus.
+
+**Wichtig:** Ein *Custom Connector in claude.ai* wird von Anthropics Servern aus aufgerufen, nicht vom eigenen Rechner. Eine reine Tailnet-Adresse (MagicDNS, `tailscale serve`) funktioniert dort daher nicht. Möglichkeiten:
+
+| Variante | Erreichbarkeit | Bewertung |
+|---|---|---|
+| A. Claude Code / Claude Desktop auf einem Rechner im Tailnet, MCP lokal eintragen | nur Tailnet | sicherste Variante, kein öffentlicher Zugang |
+| B. `tailscale funnel` nur für den MCP-Pfad + Custom Connector in claude.ai | öffentlich | nur mit Authentifizierung (HA-OAuth bzw. Long-Lived Token), widerspricht Grundsatz aus 5.4 → bewusste Entscheidung nötig |
+| C. ha-mcp-Add-on mit geheimer URL, wie bei den anderen Standorten | je nach Veröffentlichung | einheitlich mit bestehenden Connectors, geheime URL wie ein Passwort behandeln |
+
+Beispiel Variante A (Claude Code auf einem Rechner im Tailnet; Token nur lokal, nie ins Repo):
+
+```bash
+claude mcp add --transport http ha-thomas https://homeassistant.taila5009f.ts.net/api/mcp \
+  --header "Authorization: Bearer $HA_TOKEN"
+```
+
+Long-Lived Token in HA: Profil → Sicherheit → „Langlebige Zugriffstoken“. Eigenen HA-Benutzer ohne Admin-Rechte für Claude anlegen und unter Einstellungen → Sprachassistenten → Entitäten freigeben nur die nötigen Entitäten exponieren.
+
 ### 5.5 Weitere Container (Ausblick)
 
 Weitere Dienste (z. B. Mosquitto, Zigbee2MQTT, Node-RED) jeweils als eigenes Compose-Projekt unter `/volume1/docker/<dienst>/` anlegen. Diese Dateien gehören (ohne Passwörter) in dieses Repository unter `docker/<dienst>/compose.yaml`.
@@ -344,6 +367,7 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 - [ ] Prüfen, ob sich Thomas' Subnetz mit Mikes Netzen überschneidet.
 - [ ] Klären, ob Funk-Hardware (Zigbee/Z-Wave/Thread/Bluetooth) für HA benötigt wird.
 - [ ] Backup-Ziel außerhalb des NAS festlegen.
+- [ ] MCP-Anbindung: Variante A, B oder C wählen (Abschnitt 5.6) und aus dem Tailnet testen.
 
 ## Quellen
 
@@ -352,5 +376,7 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 - Exit-Nodes: <https://tailscale.com/kb/1103/exit-nodes>
 - Tailnet-Policy / Grants: <https://tailscale.com/kb/1324/grants>
 - Tailscale Serve: <https://tailscale.com/kb/1312/serve>
+- Tailscale Funnel: <https://tailscale.com/kb/1223/funnel>
+- HA Model Context Protocol Server: <https://www.home-assistant.io/integrations/mcp_server/>
 - Home Assistant Container-Installation: <https://www.home-assistant.io/installation/linux#docker-compose>
 - Synology Container Manager: <https://www.synology.com/de-de/dsm/feature/container-manager>
