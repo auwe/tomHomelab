@@ -287,7 +287,9 @@ Für die **HA-Companion-App** auf dem Handy diese URL als interne und externe UR
 
 Stand 2026-11-11: HA ist im Tailnet als `https://homeassistant.taila5009f.ts.net` erreichbar, der MCP-Endpunkt ist `https://homeassistant.taila5009f.ts.net/api/mcp` (HA-Integration „Model Context Protocol Server“).
 
-**Testergebnis:** Aus der Claude-Cloud ist die URL nicht erreichbar (ausgehende Verbindung vom Proxy blockiert, kein öffentlicher DNS-Eintrag sichtbar). Ein Test aus dem Tailnet steht noch aus.
+**Stand 2026-11-11 abends:** Funnel aktiv, Webhook-URL öffentlich erreichbar und verlangt OAuth (HA-Login). HA hört bei Thomas auf Port 80 (LAN 192.168.1.206, HAOS-VM in VMM).
+
+**Erster Test:** Aus der Claude-Cloud ist die URL nicht erreichbar (ausgehende Verbindung vom Proxy blockiert, kein öffentlicher DNS-Eintrag sichtbar). Ein Test aus dem Tailnet steht noch aus.
 
 **Wichtig:** Ein *Custom Connector in claude.ai* wird von Anthropics Servern aus aufgerufen, nicht vom eigenen Rechner. Eine reine Tailnet-Adresse (MagicDNS, `tailscale serve`) funktioniert dort daher nicht. Möglichkeiten:
 
@@ -303,7 +305,13 @@ Stand 2026-11-11: HA ist im Tailnet als `https://homeassistant.taila5009f.ts.net
 1. Einstellungen → Add-ons → Add-on-Store → ⋮ → Repositories → `https://github.com/homeassistant-ai/ha-mcp` hinzufügen.
 2. „Home Assistant MCP Server“ installieren, starten, „Beim Start starten“ und „Watchdog“ aktivieren. Im Log steht die geheime MCP-URL.
 3. „Webhook Proxy for HA MCP“ installieren und starten. Er leitet einen geheimen Webhook-Pfad von HA auf den MCP-Server weiter; die öffentliche URL steht im Log.
-4. HA öffentlich per HTTPS erreichbar machen: im Tailscale-Add-on die Option `funnel` aktivieren (alternativ Cloudflared oder Nabu Casa). Danach ist die HA-Anmeldeseite öffentlich → starke Passwörter und 2FA für alle HA-Benutzer.
+4. HA öffentlich per HTTPS erreichbar machen (alternativ Cloudflared oder Nabu Casa). Danach ist die HA-Anmeldeseite öffentlich → starke Passwörter und 2FA für alle HA-Benutzer. **Reihenfolge beachten:**
+   1. Tailscale-Admin → DNS → HTTPS Certificates aktivieren.
+   2. Tailscale-Admin → Access controls → JSON editor: `"nodeAttrs": [{"target": ["tag:tom", "autogroup:member"], "attr": ["funnel"]}]` speichern. Getaggte Geräte gehören nicht zu `autogroup:member`, daher `tag:tom` explizit.
+   3. Erst dann im Tailscale-Add-on (ab 0.30) `share_homeassistant: funnel`, `share_on_port: 443` setzen und neu starten.
+
+   > Lehre vom 2026-11-11: Wird das Add-on mit `funnel` gestartet, bevor die Policy Funnel erlaubt, bricht es mit `FATAL: Tailscale's Funnel support is disabled` ab und beendet sich komplett (Status `error`). Damit ist auch der Tailnet-Zugang zu HA weg.
+
 5. In claude.ai → Einstellungen → Connectors → Custom Connector hinzufügen, Name `HA_Thomas`, URL = öffentliche Webhook-URL aus Schritt 3. Die URL wie ein Passwort behandeln, nicht ins Repo.
 
 Beispiel Variante A (Claude Code auf einem Rechner im Tailnet; Token nur lokal, nie ins Repo):
@@ -376,7 +384,8 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 - [ ] Prüfen, ob sich Thomas' Subnetz mit Mikes Netzen überschneidet.
 - [ ] Klären, ob Funk-Hardware (Zigbee/Z-Wave/Thread/Bluetooth) für HA benötigt wird.
 - [ ] Backup-Ziel außerhalb des NAS festlegen.
-- [ ] MCP-Anbindung Variante C umsetzen und testen (Abschnitt 5.6).
+- [x] MCP-Anbindung Variante C umgesetzt; Funnel öffentlich getestet 2026-11-11 (Webhook antwortet 401 + OAuth, Metadaten 200).
+- [ ] Connector `HA_Thomas` in claude.ai anlegen und Tools testen.
 
 ## Quellen
 
@@ -389,3 +398,14 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 - HA Model Context Protocol Server: <https://www.home-assistant.io/integrations/mcp_server/>
 - Home Assistant Container-Installation: <https://www.home-assistant.io/installation/linux#docker-compose>
 - Synology Container Manager: <https://www.synology.com/de-de/dsm/feature/container-manager>
+
+## Notzugang, falls HA im Tailnet ausfällt
+
+Die Syno (100.109.143.57) erreicht HA im LAN. SSH-Weiterleitung ist auf der Syno erlaubt (`AllowTcpForwarding yes` in `/etc/ssh/sshd_config`, danach `sudo synosystemctl restart sshd`). Vom Mac:
+
+```bash
+ssh -L 8123:192.168.1.206:80 <user>@100.109.143.57
+# dann http://localhost:8123
+```
+
+Achtung: 192.168.1.206 direkt vom Mac aus führt ins Ems-Netz (gleiches Subnetz 192.168.1.0/24, geroutet über tailscale-ems).
