@@ -399,6 +399,10 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 - Home Assistant Container-Installation: <https://www.home-assistant.io/installation/linux#docker-compose>
 - Synology Container Manager: <https://www.synology.com/de-de/dsm/feature/container-manager>
 
+## Schutz gegen Passwort-Raten (seit 2026-11-11)
+
+HTTP-Einstellungen liegen seit HA 2026.8 unter Einstellungen → System → Netzwerk (nicht mehr in `configuration.yaml`; Änderungen müssen nach dem Neustart innerhalb weniger Minuten bestätigt werden, sonst werden sie zurückgesetzt). Gesetzt: IP-Sperre an, Sperre nach **10** Fehlversuchen. Getestet: Ein Fehlversuch über Funnel wird in HA mit der echten Absender-IP protokolliert (nicht mit der Proxy-IP), die Sperre trifft also nur den Angreifer. Gesperrte IPs stehen in `ip_bans.yaml` (löschen + HA-Neustart hebt die Sperre auf).
+
 ## Notzugang, falls HA im Tailnet ausfällt
 
 Die Syno (100.109.143.57) erreicht HA im LAN. SSH-Weiterleitung ist auf der Syno erlaubt (`AllowTcpForwarding yes` in `/etc/ssh/sshd_config`, danach `sudo synosystemctl restart sshd`). Vom Mac:
