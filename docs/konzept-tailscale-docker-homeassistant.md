@@ -283,6 +283,46 @@ Für die **HA-Companion-App** auf dem Handy diese URL als interne und externe UR
 
 > **Kein `tailscale funnel`** für Home Assistant, außer es gibt einen zwingenden Grund. Funnel macht den Dienst öffentlich im Internet erreichbar.
 
+### 5.6 Home Assistant als MCP-Server für Claude anbinden
+
+Stand 2026-11-11: HA ist im Tailnet als `https://homeassistant.taila5009f.ts.net` erreichbar, der MCP-Endpunkt ist `https://homeassistant.taila5009f.ts.net/api/mcp` (HA-Integration „Model Context Protocol Server“).
+
+**Stand 2026-11-11 abends:** Funnel aktiv, Webhook-URL öffentlich erreichbar und verlangt OAuth (HA-Login). HA hört bei Thomas auf Port 80 (LAN 192.168.1.206, HAOS-VM in VMM).
+
+**Erster Test:** Aus der Claude-Cloud ist die URL nicht erreichbar (ausgehende Verbindung vom Proxy blockiert, kein öffentlicher DNS-Eintrag sichtbar). Ein Test aus dem Tailnet steht noch aus.
+
+**Wichtig:** Ein *Custom Connector in claude.ai* wird von Anthropics Servern aus aufgerufen, nicht vom eigenen Rechner. Eine reine Tailnet-Adresse (MagicDNS, `tailscale serve`) funktioniert dort daher nicht. Möglichkeiten:
+
+| Variante | Erreichbarkeit | Bewertung |
+|---|---|---|
+| A. Claude Code / Claude Desktop auf einem Rechner im Tailnet, MCP lokal eintragen | nur Tailnet | sicherste Variante, kein öffentlicher Zugang |
+| B. `tailscale funnel` nur für den MCP-Pfad + Custom Connector in claude.ai | öffentlich | nur mit Authentifizierung (HA-OAuth bzw. Long-Lived Token), widerspricht Grundsatz aus 5.4 → bewusste Entscheidung nötig |
+| C. ha-mcp-Add-on mit geheimer URL, wie bei den anderen Standorten | je nach Veröffentlichung | einheitlich mit bestehenden Connectors, geheime URL wie ein Passwort behandeln |
+
+
+**Entscheidung 2026-11-11: Variante C** (wie bei Karin: Add-on „Home Assistant MCP Server“ + „Webhook Proxy for HA MCP“ aus dem Repository `https://github.com/homeassistant-ai/ha-mcp`).
+
+1. Einstellungen → Add-ons → Add-on-Store → ⋮ → Repositories → `https://github.com/homeassistant-ai/ha-mcp` hinzufügen.
+2. „Home Assistant MCP Server“ installieren, starten, „Beim Start starten“ und „Watchdog“ aktivieren. Im Log steht die geheime MCP-URL.
+3. „Webhook Proxy for HA MCP“ installieren und starten. Er leitet einen geheimen Webhook-Pfad von HA auf den MCP-Server weiter; die öffentliche URL steht im Log.
+4. HA öffentlich per HTTPS erreichbar machen (alternativ Cloudflared oder Nabu Casa). Danach ist die HA-Anmeldeseite öffentlich → starke Passwörter und 2FA für alle HA-Benutzer. **Reihenfolge beachten:**
+   1. Tailscale-Admin → DNS → HTTPS Certificates aktivieren.
+   2. Tailscale-Admin → Access controls → JSON editor: `"nodeAttrs": [{"target": ["tag:tom", "autogroup:member"], "attr": ["funnel"]}]` speichern. Getaggte Geräte gehören nicht zu `autogroup:member`, daher `tag:tom` explizit.
+   3. Erst dann im Tailscale-Add-on (ab 0.30) `share_homeassistant: funnel`, `share_on_port: 443` setzen und neu starten.
+
+   > Lehre vom 2026-11-11: Wird das Add-on mit `funnel` gestartet, bevor die Policy Funnel erlaubt, bricht es mit `FATAL: Tailscale's Funnel support is disabled` ab und beendet sich komplett (Status `error`). Damit ist auch der Tailnet-Zugang zu HA weg.
+
+5. In claude.ai → Einstellungen → Connectors → Custom Connector hinzufügen, Name `HA_Thomas`, URL = öffentliche Webhook-URL aus Schritt 3. Die URL wie ein Passwort behandeln, nicht ins Repo.
+
+Beispiel Variante A (Claude Code auf einem Rechner im Tailnet; Token nur lokal, nie ins Repo):
+
+```bash
+claude mcp add --transport http ha-thomas https://homeassistant.taila5009f.ts.net/api/mcp \
+  --header "Authorization: Bearer $HA_TOKEN"
+```
+
+Long-Lived Token in HA: Profil → Sicherheit → „Langlebige Zugriffstoken“. Eigenen HA-Benutzer ohne Admin-Rechte für Claude anlegen und unter Einstellungen → Sprachassistenten → Entitäten freigeben nur die nötigen Entitäten exponieren.
+
 ### 5.5 Weitere Container (Ausblick)
 
 Weitere Dienste (z. B. Mosquitto, Zigbee2MQTT, Node-RED) jeweils als eigenes Compose-Projekt unter `/volume1/docker/<dienst>/` anlegen. Diese Dateien gehören (ohne Passwörter) in dieses Repository unter `docker/<dienst>/compose.yaml`.
@@ -341,9 +381,13 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 ## 9. Offene Punkte
 
 - [ ] Ergebnisse der Checkliste (Modell, CPU, RAM, DSM-Version, Subnetz) eintragen.
-- [ ] Prüfen, ob sich Thomas' Subnetz mit Mikes Netzen überschneidet.
+- [x] Subnetz-Überschneidung geprüft: Thomas' LAN und Ems nutzen beide 192.168.1.0/24 (Mikes Tailnet routet es nach Ems). Für ein Subnet-Routing bei Thomas wäre 4via6 nötig.
 - [ ] Klären, ob Funk-Hardware (Zigbee/Z-Wave/Thread/Bluetooth) für HA benötigt wird.
 - [ ] Backup-Ziel außerhalb des NAS festlegen.
+- [x] MCP-Anbindung Variante C umgesetzt; Funnel öffentlich getestet 2026-11-11 (Webhook antwortet 401 + OAuth, Metadaten 200).
+- [x] Connector `HA_Thomas` in claude.ai angelegt und getestet (2026-11-11); ha-mcp auf 9.2.0 aktualisiert.
+- [x] Login-Sperre (10 Fehlversuche) aktiv, 2FA für Mikes HA-Benutzer aktiv.
+- [ ] 2FA für Thomas' eigenen HA-Benutzer klären.
 
 ## Quellen
 
@@ -352,5 +396,24 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 - Exit-Nodes: <https://tailscale.com/kb/1103/exit-nodes>
 - Tailnet-Policy / Grants: <https://tailscale.com/kb/1324/grants>
 - Tailscale Serve: <https://tailscale.com/kb/1312/serve>
+- Tailscale Funnel: <https://tailscale.com/kb/1223/funnel>
+- HA Model Context Protocol Server: <https://www.home-assistant.io/integrations/mcp_server/>
 - Home Assistant Container-Installation: <https://www.home-assistant.io/installation/linux#docker-compose>
 - Synology Container Manager: <https://www.synology.com/de-de/dsm/feature/container-manager>
+
+## Schutz gegen Passwort-Raten (seit 2026-11-11)
+
+HTTP-Einstellungen liegen seit HA 2026.8 unter Einstellungen → System → Netzwerk (nicht mehr in `configuration.yaml`; Änderungen müssen nach dem Neustart innerhalb weniger Minuten bestätigt werden, sonst werden sie zurückgesetzt). Gesetzt: IP-Sperre an, Sperre nach **10** Fehlversuchen. Getestet: Ein Fehlversuch über Funnel wird in HA mit der echten Absender-IP protokolliert (nicht mit der Proxy-IP), die Sperre trifft also nur den Angreifer. Gesperrte IPs stehen in `ip_bans.yaml` (löschen + HA-Neustart hebt die Sperre auf).
+
+**Zwei-Faktor-Anmeldung (2FA):** Mikes HA-Benutzer hat seit 2026-11-13 TOTP aktiv (Profil → Sicherheit → Multi-Faktor-Authentifizierung). 2FA gilt pro Benutzer und muss von jedem selbst eingeschaltet werden. Der Connector `HA_Thomas` fragt den Code erst beim nächsten Neu-Verbinden ab.
+
+## Notzugang, falls HA im Tailnet ausfällt
+
+Die Syno (100.109.143.57) erreicht HA im LAN. SSH-Weiterleitung ist auf der Syno erlaubt (`AllowTcpForwarding yes` in `/etc/ssh/sshd_config`, danach `sudo synosystemctl restart sshd`). Vom Mac:
+
+```bash
+ssh -L 8123:192.168.1.206:80 <user>@100.109.143.57
+# dann http://localhost:8123
+```
+
+Achtung: 192.168.1.206 direkt vom Mac aus führt ins Ems-Netz (gleiches Subnetz 192.168.1.0/24, geroutet über tailscale-ems).
