@@ -381,11 +381,13 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 ## 9. Offene Punkte
 
 - [ ] Ergebnisse der Checkliste (Modell, CPU, RAM, DSM-Version, Subnetz) eintragen.
-- [ ] Prüfen, ob sich Thomas' Subnetz mit Mikes Netzen überschneidet.
+- [x] Subnetz-Überschneidung geprüft: Thomas' LAN und Ems nutzen beide 192.168.1.0/24 (Mikes Tailnet routet es nach Ems). Für ein Subnet-Routing bei Thomas wäre 4via6 nötig.
 - [ ] Klären, ob Funk-Hardware (Zigbee/Z-Wave/Thread/Bluetooth) für HA benötigt wird.
 - [ ] Backup-Ziel außerhalb des NAS festlegen.
 - [x] MCP-Anbindung Variante C umgesetzt; Funnel öffentlich getestet 2026-11-11 (Webhook antwortet 401 + OAuth, Metadaten 200).
 - [x] Connector `HA_Thomas` in claude.ai angelegt und getestet (2026-11-11); ha-mcp auf 9.2.0 aktualisiert.
+- [x] Login-Sperre (10 Fehlversuche) aktiv, 2FA für Mikes HA-Benutzer aktiv.
+- [ ] 2FA für Thomas' eigenen HA-Benutzer klären.
 
 ## Quellen
 
@@ -402,6 +404,8 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 ## Schutz gegen Passwort-Raten (seit 2026-11-11)
 
 HTTP-Einstellungen liegen seit HA 2026.8 unter Einstellungen → System → Netzwerk (nicht mehr in `configuration.yaml`; Änderungen müssen nach dem Neustart innerhalb weniger Minuten bestätigt werden, sonst werden sie zurückgesetzt). Gesetzt: IP-Sperre an, Sperre nach **10** Fehlversuchen. Getestet: Ein Fehlversuch über Funnel wird in HA mit der echten Absender-IP protokolliert (nicht mit der Proxy-IP), die Sperre trifft also nur den Angreifer. Gesperrte IPs stehen in `ip_bans.yaml` (löschen + HA-Neustart hebt die Sperre auf).
+
+**Zwei-Faktor-Anmeldung (2FA):** Mikes HA-Benutzer hat seit 2026-11-13 TOTP aktiv (Profil → Sicherheit → Multi-Faktor-Authentifizierung). 2FA gilt pro Benutzer und muss von jedem selbst eingeschaltet werden. Der Connector `HA_Thomas` fragt den Code erst beim nächsten Neu-Verbinden ab.
 
 ## Notzugang, falls HA im Tailnet ausfällt
 
