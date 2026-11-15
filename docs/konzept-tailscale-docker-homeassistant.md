@@ -338,19 +338,26 @@ Zusätzlich zum Tailscale Funnel ist HA über einen Cloudflare Tunnel erreichbar
 
 **Add-on in HA:**
 
-1. Das Repository `https://github.com/brenner-tobias/ha-addons` ist hinzugefügt. Daraus ist das Add-on „Cloudflared“ (`9074a9fa_cloudflared`) installiert.
-2. Die Konfiguration ist ein lokal verwalteter Tunnel ohne Token:
+1. Das Repository `https://github.com/brenner-tobias/ha-addons` ist hinzugefügt. Daraus ist das Add-on „Cloudflared“ (`9074a9fa_cloudflared`) installiert. Watchdog, Autostart und Auto-Update sind an.
+2. **Seit 2026-11-15 wird der Tunnel im Cloudflare-Dashboard verwaltet (Token-Modus).** Die Routen pflegt Mike in Cloudflare unter Zero Trust → Networks → Tunnels → „Goelles“ → Routes. Im Add-on steht nur noch:
    ```yaml
-   external_hostname: ha-goelles.auwe.ch
-   tunnel_name: Goelles
+   tunnel_token: "<Token aus dem Cloudflare-Dashboard>"
    ```
-   Watchdog, Autostart und Auto-Update sind an.
-3. Beim ersten Start steht im Log ein Cloudflare-Login-Link. Den öffnet man, meldet sich an und wählt die Zone auwe.ch aus. Danach legt das Add-on den Tunnel und den DNS-Eintrag selbst an. Am 2026-11-15 waren danach 4 Verbindungen aktiv (Zürich und Amsterdam).
+   Wenn `tunnel_token` gesetzt ist, ignoriert das Add-on alle anderen Optionen. Der Token gehört nicht ins Repo, er liegt in Vaultwarden unter Homelab. Ein neuer Token lässt sich im Dashboard über „Rotate token“ erzeugen, danach muss er im Add-on ersetzt werden.
+3. Aktuelle Routen:
+
+   | Hostname | Service | Hinweis |
+   |---|---|---|
+   | `ha-goelles.auwe.ch` | `http://homeassistant:80` | Home Assistant |
+   | `dsm-goelles.auwe.ch` | `https://192.168.1.30:5001` | DSM, „No TLS Verify“ an (selbst signiertes Zertifikat); sollte hinter Cloudflare Access |
+
 4. In HA unter Einstellungen → System → Netzwerk → HTTP-Server → Reverse-Proxy muss `172.30.33.0/24` (das Add-on-Netz) zu den vertrauenswürdigen Proxys. `127.0.0.1/32` muss für den Tailscale Funnel bleiben. Nach dem Speichern startet HA neu. Die Änderung muss danach innerhalb weniger Minuten bestätigt werden, sonst wird sie zurückgesetzt. Ohne diesen Eintrag antwortet HA über den Tunnel mit „400 Bad Request“.
+
+> Vorgeschichte: Der Tunnel wurde zuerst lokal verwaltet eingerichtet, wie bei Karin (`external_hostname`, `tunnel_name: Goelles`, Login-Link im Log). Dann ließen sich die Routen im Dashboard aber nicht ändern, und das Login-Zertifikat im Add-on hätte Rechte im ganzen Cloudflare-Konto gehabt. Deshalb wurde noch am selben Tag auf den Token-Modus umgestellt.
 
 **Parallelbetrieb:** Tailscale Funnel und der Connector `HA_Thomas` laufen unverändert weiter. Ob der Connector auf `ha-goelles.auwe.ch` umzieht und der Funnel danach abgeschaltet wird, ist noch nicht entschieden.
 
-**Weitere Dienste:** Sie kommen bei Bedarf über `additional_hosts` im Add-on dazu, z. B. `dsm-goelles.auwe.ch` mit `https://192.168.1.30:5001` und `noTLSVerify`. Admin-Oberflächen wie DSM sollten nur hinter Cloudflare Access veröffentlicht werden. Für HA selbst ist Access nicht sinnvoll, weil die Companion-App damit nicht umgehen kann. Hier schützen 2FA und die Login-Sperre.
+**Weitere Dienste:** Sie kommen als zusätzliche Route im Cloudflare-Dashboard dazu. Am Add-on muss dafür nichts geändert werden. Admin-Oberflächen wie DSM sollten nur hinter Cloudflare Access veröffentlicht werden. Für HA selbst ist Access nicht sinnvoll, weil die Companion-App damit nicht umgehen kann. Hier schützen 2FA und die Login-Sperre.
 
 ### 5.5 Weitere Container (Ausblick)
 
@@ -420,7 +427,8 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 - [x] Cloudflare Tunnel `ha-goelles.auwe.ch` eingerichtet (2026-11-15, Zone auwe.ch in Mikes Konto, siehe 5.7).
 - [ ] DNSSEC für auwe.ch bei all-inkl prüfen, ggf. später in Cloudflare aktivieren.
 - [ ] Entscheiden, ob `HA_Thomas` auf `ha-goelles.auwe.ch` umzieht und der Funnel danach abgeschaltet wird.
-- [ ] Optional: `dsm-goelles.auwe.ch` hinter Cloudflare Access.
+- [ ] `dsm-goelles.auwe.ch` (seit 2026-11-15 öffentlich) hinter Cloudflare Access stellen.
+- [ ] Karin ebenfalls auf dashboard-verwalteten Tunnel umstellen (einheitlich).
 
 ## Quellen
 
