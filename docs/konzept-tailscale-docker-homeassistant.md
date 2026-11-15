@@ -323,6 +323,40 @@ claude mcp add --transport http ha-thomas https://homeassistant.taila5009f.ts.ne
 
 Long-Lived Token in HA: Profil → Sicherheit → „Langlebige Zugriffstoken“. Eigenen HA-Benutzer ohne Admin-Rechte für Claude anlegen und unter Einstellungen → Sprachassistenten → Entitäten freigeben nur die nötigen Entitäten exponieren.
 
+### 5.7 Zugang über Cloudflare Tunnel (`ha-goelles.auwe.ch`, seit 2026-11-15)
+
+Zusätzlich zum Tailscale Funnel ist HA über einen Cloudflare Tunnel erreichbar. Er wird in Mikes Cloudflare-Konto verwaltet, nach dem gleichen Muster wie bei Karin (`homeassistant-karin.auwe.at`). Thomas wohnt in der Schweiz, deshalb liegt er unter der Domain **auwe.ch**.
+
+**Namensschema:** `<dienst>-<standort>.auwe.ch`, also z. B. `ha-goelles.auwe.ch` und später `dsm-goelles.auwe.ch`. Die Namen haben bewusst nur eine Ebene unter der Domain, denn das kostenlose Universal-SSL-Zertifikat von Cloudflare deckt nur `*.auwe.ch` ab. Ein Name wie `ha.tom.auwe.ch` hätte kein gültiges Zertifikat.
+
+**Domain auwe.ch:**
+
+1. Die Zone auwe.ch ist in Mikes Cloudflare-Konto angelegt (Free-Plan). Alle bestehenden Einträge, auch MX, SPF und DKIM, wurden übernommen.
+2. Beim Registrar all-inkl stehen die Nameserver auf `augustus.ns.cloudflare.com` und `desiree.ns.cloudflare.com`. Vorher waren es `ns5/ns6.kasserver.com`.
+3. Die Zone ist seit 2026-11-15 „Active“.
+4. DNSSEC muss bei all-inkl aus sein, sonst löst die Domain nicht mehr auf. Es kann später in Cloudflare neu aktiviert werden.
+
+**Add-on in HA:**
+
+1. Das Repository `https://github.com/brenner-tobias/ha-addons` ist hinzugefügt. Daraus ist das Add-on „Cloudflared“ (`9074a9fa_cloudflared`) installiert. Watchdog, Autostart und Auto-Update sind an.
+2. Der Tunnel wird **lokal im Add-on verwaltet**, genau wie bei Karin (Entscheidung Mike, 2026-11-15). Die Routen pflegt man in HA unter Apps → Cloudflared → Konfiguration, nicht im Cloudflare-Dashboard. Dort sind sie nur sichtbar und gesperrt („locally managed“). Aktuelle Konfiguration:
+   ```yaml
+   external_hostname: ha-goelles.auwe.ch
+   tunnel_name: Goelles
+   additional_hosts:
+     - hostname: dsm-goelles.auwe.ch
+       service: https://192.168.1.30:5001
+   ```
+   `tunnel_name` darf nicht fehlen, sonst legt das Add-on einen neuen Tunnel an. Ein leerer `external_hostname` bringt das Add-on in den Fehlerzustand. Nach einer Änderung startet man das Add-on neu. DNS-Einträge für neue Hostnamen legt es dabei selbst an.
+3. Beim ersten Start steht im Log ein Cloudflare-Login-Link. Den öffnet man, meldet sich an und wählt die Zone auwe.ch aus. Das Add-on speichert dabei ein Zertifikat, das in Mikes Cloudflare-Konto Tunnel und DNS-Einträge anlegen darf. Es steckt auch in jedem HA-Backup, die Backups bleiben deshalb verschlüsselt.
+4. In HA unter Einstellungen → System → Netzwerk → HTTP-Server → Reverse-Proxy muss `172.30.33.0/24` (das Add-on-Netz) zu den vertrauenswürdigen Proxys. `127.0.0.1/32` muss für den Tailscale Funnel bleiben. Nach dem Speichern startet HA neu. Die Änderung muss danach innerhalb weniger Minuten bestätigt werden, sonst wird sie zurückgesetzt. Ohne diesen Eintrag antwortet HA über den Tunnel mit „400 Bad Request“.
+
+> Alternative: Ein dashboard-verwalteter Tunnel (Add-on nur mit `tunnel_token`) wurde erwogen, aber verworfen, damit es einheitlich mit Karin bleibt. Bei einer späteren Umstellung legt man einen neuen Tunnel im Dashboard an, trägt den Token ins Add-on ein, löscht die alten CNAMEs, legt die Routen neu an und löscht danach den alten Tunnel. Einen Migrations-Button gab es in der Cloudflare-Oberfläche nicht.
+
+**Parallelbetrieb:** Tailscale Funnel und der Connector `HA_Thomas` laufen unverändert weiter. Ob der Connector auf `ha-goelles.auwe.ch` umzieht und der Funnel danach abgeschaltet wird, ist noch nicht entschieden.
+
+**Weitere Dienste:** Sie kommen über `additional_hosts` im Add-on dazu. Admin-Oberflächen wie DSM sollten nur hinter Cloudflare Access veröffentlicht werden. Für HA selbst ist Access nicht sinnvoll, weil die Companion-App damit nicht umgehen kann. Hier schützen 2FA und die Login-Sperre.
+
 ### 5.5 Weitere Container (Ausblick)
 
 Weitere Dienste (z. B. Mosquitto, Zigbee2MQTT, Node-RED) jeweils als eigenes Compose-Projekt unter `/volume1/docker/<dienst>/` anlegen. Diese Dateien gehören (ohne Passwörter) in dieses Repository unter `docker/<dienst>/compose.yaml`.
@@ -388,6 +422,10 @@ Mindestens **einmal eine Wiederherstellung testen** (z. B. HA-Backup in einen Te
 - [x] Connector `HA_Thomas` in claude.ai angelegt und getestet (2026-11-11); ha-mcp auf 9.2.0 aktualisiert.
 - [x] Login-Sperre (10 Fehlversuche) aktiv, 2FA für Mikes HA-Benutzer aktiv.
 - [ ] 2FA für Thomas' eigenen HA-Benutzer klären.
+- [x] Cloudflare Tunnel `ha-goelles.auwe.ch` eingerichtet (2026-11-15, Zone auwe.ch in Mikes Konto, siehe 5.7).
+- [ ] DNSSEC für auwe.ch bei all-inkl prüfen, ggf. später in Cloudflare aktivieren.
+- [ ] Entscheiden, ob `HA_Thomas` auf `ha-goelles.auwe.ch` umzieht und der Funnel danach abgeschaltet wird.
+- [ ] `dsm-goelles.auwe.ch` (seit 2026-11-15 öffentlich) hinter Cloudflare Access stellen.
 
 ## Quellen
 
